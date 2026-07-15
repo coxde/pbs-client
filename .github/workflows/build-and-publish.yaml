@@ -2,9 +2,11 @@ name: Build and Publish Container Image
 
 on:
     push:
-        branches: [main]
+        branches:
+            - "main"
+            - "renovate/**"
     schedule:
-        - cron: "0 9 * * 6"
+        - cron: "25 6 * * 0" # At 06:25 on every Sunday.
     workflow_dispatch:
 
 env:
