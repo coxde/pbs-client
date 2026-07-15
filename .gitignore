@@ -1,8 +1,8 @@
-# Docker compose default config storage folder
-docker-compose/pbsconfig
+# Compose default config storage folder
+container/pbsconfig/
 
-# Docker compose default backups storage test folder
-docker-compose/backups
+# Compose default backups storage test folder
+container/backups/
 
 # Any accidental keys
 *.pem
