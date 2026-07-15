@@ -1,6 +1,6 @@
 services:
     pbs-client:
-        image: ghcr.io/coxde/pbs-client:latest
+        image: ghcr.io/coxde/pbs-client:latest@sha256:7e5f0ddabf48462ab47b626567ab94ef03c6cd7a059d51b07a76c79c8045dcaf
         # Adjust the container name and hostname to change the naming within the PBS server
         # backups, e.g. this would set ``host/pbs-client``.
         container_name: pbs-client
