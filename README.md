@@ -39,7 +39,7 @@ Forked from [Aterfax/pbs-client-docker](https://github.com/Aterfax/pbs-client-do
 
 ### Using a self built image
 
-- Run the command `docker/podman build -t $USER/pbs-client .`
+- Run the command `docker/podman build -t localhost/pbs-client .`
 - Take a note of the final line of this command's output e.g. : `localhost/pbs-client`
 
 - Amend the [compose.yml](compose.yml) image line to: `image: localhost/pbs-client`

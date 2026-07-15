@@ -19,19 +19,13 @@ jobs:
                   submodules: recursive
 
             - name: Force permissions fix
-              run: sudo apt-get update && sudo apt-get install dos2unix -y && cd docker && bash dos2unix.sh
+              run: sudo apt-get update && sudo apt-get install dos2unix -y && cd ./container && bash dos2unix.sh
 
             - name: Set up QEMU
               uses: docker/setup-qemu-action@v4
 
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@v4
-
-            - name: Login to DockerHub
-              uses: docker/login-action@v4
-              with:
-                  username: ${{ secrets.DOCKERHUB_USERNAME }}
-                  password: ${{ secrets.DOCKERHUB_TOKEN }}
 
             - name: Login to Github Packages
               uses: docker/login-action@v4
@@ -44,19 +38,18 @@ jobs:
               run: echo "DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
 
             ###########################################################
-            # Build + push AMD64 image (uses Containerfile)
+            # Build AMD64 image (uses Containerfile)
             ###########################################################
-            - name: Build and push AMD64 image
+            - name: Build AMD64 image
               run: |
                   docker buildx build \
                     --platform linux/amd64 \
-                    -f docker/Dockerfile \
-                    -t aterfax/pbs-client:amd64-latest \
-                    -t aterfax/pbs-client:amd64-${DATE} \
-                    -t ghcr.io/aterfax/pbs-client:amd64-latest \
-                    -t ghcr.io/aterfax/pbs-client:amd64-${DATE} \
-                    ./docker \
-                    --push
+                    -f ./Containerfile \
+                    -t coxde/pbs-client:amd64-latest \
+                    -t coxde/pbs-client:amd64-${DATE} \
+                    -t ghcr.io/coxde/pbs-client:amd64-latest \
+                    -t ghcr.io/coxde/pbs-client:amd64-${DATE} \
+                    .
 
             ###########################################################
             # Build ARM64 debs
@@ -66,52 +59,39 @@ jobs:
                   docker buildx build \
                     -o proxmox-backup-arm64/packages \
                     --build-arg buildoptions="cross github client" \
-                    --build-arg baseimage=debian:bookworm-slim \
+                    --build-arg baseimage=debian:trixie-slim \
                     --platform linux/amd64 \
                     -f proxmox-backup-arm64/.github/Dockerfile.crosscompile-arm64 \
                     proxmox-backup-arm64
 
             ###########################################################
-            # Build + push ARM64 image (uses Containerfile.arm64)
+            # Build ARM64 image (uses Containerfile.arm64)
             ###########################################################
-            - name: Build and push ARM64 image
+            - name: Build ARM64 image
               run: |
-                  cp -r proxmox-backup-arm64/packages docker/packages
+                  cp -r proxmox-backup-arm64/packages ./packages
                   docker buildx build \
                     --platform linux/arm64 \
-                    -f docker/Dockerfile.arm64 \
-                    -t aterfax/pbs-client:arm64-latest \
-                    -t aterfax/pbs-client:arm64-${DATE} \
-                    -t ghcr.io/aterfax/pbs-client:arm64-latest \
-                    -t ghcr.io/aterfax/pbs-client:arm64-${DATE} \
-                    ./docker \
-                    --push
+                    -f ./Containerfile.arm64 \
+                    -t coxde/pbs-client:arm64-latest \
+                    -t coxde/pbs-client:arm64-${DATE} \
+                    -t ghcr.io/coxde/pbs-client:arm64-latest \
+                    -t ghcr.io/coxde/pbs-client:arm64-${DATE} \
+                    .
 
             ###########################################################
             # Create multi-arch manifests
             ###########################################################
             - name: Create and push multi-arch manifest
               run: |
-                  # DockerHub latest
-                  docker buildx imagetools create \
-                    -t aterfax/pbs-client:latest \
-                    aterfax/pbs-client:amd64-latest \
-                    aterfax/pbs-client:arm64-latest
-
-                  # DockerHub dated
-                  docker buildx imagetools create \
-                    -t aterfax/pbs-client:${DATE} \
-                    aterfax/pbs-client:amd64-${DATE} \
-                    aterfax/pbs-client:arm64-${DATE}
-
                   # GHCR latest
                   docker buildx imagetools create \
-                    -t ghcr.io/aterfax/pbs-client:latest \
-                    ghcr.io/aterfax/pbs-client:amd64-latest \
-                    ghcr.io/aterfax/pbs-client:arm64-latest
+                    -t ghcr.io/coxde/pbs-client:latest \
+                    ghcr.io/coxde/pbs-client:amd64-latest \
+                    ghcr.io/coxde/pbs-client:arm64-latest
 
                   # GHCR dated
                   docker buildx imagetools create \
-                    -t ghcr.io/aterfax/pbs-client:${DATE} \
-                    ghcr.io/aterfax/pbs-client:amd64-${DATE} \
-                    ghcr.io/aterfax/pbs-client:arm64-${DATE}
+                    -t ghcr.io/coxde/pbs-client:${DATE} \
+                    ghcr.io/coxde/pbs-client:amd64-${DATE} \
+                    ghcr.io/coxde/pbs-client:arm64-${DATE}

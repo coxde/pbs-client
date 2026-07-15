@@ -1,25 +1,32 @@
 #
-# Proxmox Backup Solution Client Dockerfile.
+# Proxmox Backup Client Containerfile.
 #
-#
-FROM ghcr.io/linuxserver/baseimage-debian:bookworm
 
-LABEL maintainer="Aterfax"
+FROM ghcr.io/linuxserver/baseimage-debian:trixie
 
-# Get initial required packages
+LABEL maintainer="coxde"
+
+# Install runtime dependencies
 RUN apt-get update && apt-get install -y wget cron expect nullmailer bsd-mailx ca-certificates
 
 # Get the Proxmox signing keys and add to trust store
-RUN curl -o /etc/apt/trusted.gpg.d/proxmox-release-bookworm.gpg https://enterprise.proxmox.com/debian/proxmox-release-bookworm.gpg && \
-echo "deb http://download.proxmox.com/debian/pbs-client bookworm main" > /etc/apt/sources.list.d/pbs-client.list
+RUN wget https://enterprise.proxmox.com/debian/proxmox-archive-keyring-trixie.gpg \
+      -O /usr/share/keyrings/proxmox-archive-keyring.gpg
+RUN cat > /etc/apt/sources.list.d/pbs-client.sources <<EOF
+Types: deb
+URIs: http://download.proxmox.com/debian/pbs-client
+Suites: trixie
+Components: main
+Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
+EOF
 
 # Run updates, installs and clean up to minimise image size
 RUN apt-get update && \
-apt-get install -y proxmox-backup-client && \
-apt-get autoclean -y && \
-apt-get autoremove -y && \
-rm -rf /var/lib/apt/lists/* && \
-rm -rf /var/cache/apt/archives
+    apt-get install -y proxmox-backup-client && \
+    apt-get autoclean -y && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /var/cache/apt/archives
 
 # This is the mount point to put your volumes / bind mounts.
 RUN mkdir /backups
