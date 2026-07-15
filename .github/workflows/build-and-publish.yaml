@@ -1,9 +1,9 @@
-name: Build and Publish Container Image
+name: Build and Publish Image
 
 on:
-    push:
+    pull_request:
         branches:
-            - "renovate/**"
+            - main
         paths-ignore:
             - "**.md"
             - ".github/workflows/renovate.json5"
