@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y wget cron expect nullmailer bsd-mailx c
     rm -rf /var/lib/apt/lists/*
 
 # Copy the locally-built ARM64 packages from host (to be provided by workflow)
-COPY ./packages/*.deb /tmp/
+COPY ./proxmox-backup-arm64/packages/*.deb /tmp/
 
 # Install the ARM64 packages
 RUN dpkg -i /tmp/proxmox-backup-client_*.deb || apt-get -f install -y && rm -rf /tmp/*
