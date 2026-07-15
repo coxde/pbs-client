@@ -5,6 +5,9 @@ on:
         branches:
             - "main"
             - "renovate/**"
+        paths-ignore:
+            - "**.md"
+            - ".github/workflows/renovate.json5"
     schedule:
         - cron: "25 6 * * 0" # At 06:25 on every Sunday.
     workflow_dispatch:
