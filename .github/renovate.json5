@@ -5,7 +5,7 @@
     "packageRules": [
       {
         "matchUpdateTypes": ['minor', 'patch', 'pin', 'pinDigest', 'digest'],
-        "automerge": false,
+        "automerge": true,
         "automergeType": "branch"
       }
     ]

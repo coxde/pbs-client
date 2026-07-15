@@ -1,9 +1,12 @@
 name: Build and Publish Image
 
 on:
+    push:
+        branches:
+            - "renovate/**"
     pull_request:
         branches:
-            - main
+            - "main"
         paths-ignore:
             - "**.md"
             - ".github/workflows/renovate.json5"
