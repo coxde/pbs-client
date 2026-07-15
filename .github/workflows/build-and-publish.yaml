@@ -15,6 +15,9 @@ jobs:
     build-and-push-image:
         name: Build and Push Image to Registry
         runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            packages: write
 
         steps:
             - name: Checkout repo
