@@ -13,6 +13,8 @@ Forked from [Aterfax/pbs-client-docker](https://github.com/Aterfax/pbs-client-do
 
 ### Prerequisites
 
+`docker/podman pull ghcr.io/coxde/pbs-client:latest`
+
 - You are running a platform which supports Docker/Podman and you have Docker/Podman installed on your system.
 - You understand how to bind mount/volume mount in Docker/Podman.
 
