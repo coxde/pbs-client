@@ -19,9 +19,48 @@ env:
     IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+    build-image-check:
+        name: Build Image Check
+        runs-on: ubuntu-latest
+        if: ${{ github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/renovate/') }}
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+              with:
+                  submodules: recursive
+
+            - name: Force permissions fix
+              run: sudo apt-get update && sudo apt-get install dos2unix -y && cd ./container && bash dos2unix.sh
+
+            - name: Set up QEMU
+              uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+
+            - name: Build arm64 packages (ci check)
+              run: |
+                  docker buildx build \
+                    -o proxmox-backup-arm64/packages \
+                    --build-arg buildoptions="cross github client" \
+                    --build-arg baseimage=debian:trixie-slim \
+                    --platform linux/amd64 \
+                    -f proxmox-backup-arm64/.github/Dockerfile.crosscompile-arm64 \
+                    proxmox-backup-arm64
+
+            - name: Build arm64 image (ci check)
+              uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+              with:
+                  context: .
+                  file: ./Containerfile.arm64
+                  platforms: linux/arm64
+                  push: false
+
     build-and-push-image:
         name: Build and Push Image to Registry
         runs-on: ubuntu-latest
+        if: ${{ github.event_name != 'pull_request' }}
         permissions:
             contents: read
             packages: write
@@ -48,9 +87,7 @@ jobs:
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
 
-            ######## Pull request check ########
-            - name: Build arm64 packages (pr check)
-              if: github.event_name == 'pull_request'
+            - name: Build arm64 packages
               run: |
                   docker buildx build \
                     -o proxmox-backup-arm64/packages \
@@ -60,18 +97,7 @@ jobs:
                     -f proxmox-backup-arm64/.github/Dockerfile.crosscompile-arm64 \
                     proxmox-backup-arm64
 
-            - name: Build arm64 image (pr check)
-              if: github.event_name == 'pull_request'
-              uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
-              with:
-                  context: .
-                  file: ./Containerfile.arm64
-                  platforms: linux/arm64
-                  push: false
-
-            ######## Build images ########
-            - name: Build amd64 image (from Containerfile)
-              if: github.event_name != 'pull_request'
+            - name: Build amd64 image
               uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
               with:
                   context: .
@@ -80,19 +106,7 @@ jobs:
                   push: true
                   tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:amd64-${{ github.sha }}
 
-            - name: Build arm64 packages
-              if: github.event_name != 'pull_request'
-              run: |
-                  docker buildx build \
-                    -o proxmox-backup-arm64/packages \
-                    --build-arg buildoptions="cross github client" \
-                    --build-arg baseimage=debian:trixie-slim \
-                    --platform linux/amd64 \
-                    -f proxmox-backup-arm64/.github/Dockerfile.crosscompile-arm64 \
-                    proxmox-backup-arm64
-
-            - name: Build arm64 image (from Containerfile.arm64)
-              if: github.event_name != 'pull_request'
+            - name: Build arm64 image
               uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
               with:
                   context: .
@@ -102,7 +116,6 @@ jobs:
                   tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:arm64-${{ github.sha }}
 
             - name: Create and push multi-arch manifest
-              if: github.event_name != 'pull_request'
               run: |
                   docker buildx imagetools create \
                     -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
