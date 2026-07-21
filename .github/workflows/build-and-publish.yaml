@@ -60,7 +60,7 @@ jobs:
     build-and-push-image:
         name: Build and Push Image to Registry
         runs-on: ubuntu-latest
-        if: ${{ github.event_name != 'pull_request' }}
+        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
         permissions:
             contents: read
             packages: write
