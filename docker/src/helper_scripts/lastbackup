@@ -1,0 +1,22 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+
+# =============================================================================
+# Last backup timestamp display script
+# Shows the timestamp of the last successful backup run
+# e.g.
+#
+# root@pbs-client:/# lastbackup 
+# 2026-07-25 14:35:01
+#
+# Must be run within the container. i.e. start a terminal in the container:
+#        docker exec -it container_name bash
+# =============================================================================
+
+lastrunfile="/tmp/pbs_client_lastrun"
+
+if [ -s "$lastrunfile" ]; then
+    cat "$lastrunfile"
+else
+    echo "The first backup since container start has not happened yet."
+fi
