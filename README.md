@@ -6,6 +6,7 @@ Forked from [Aterfax/pbs-client-docker](https://github.com/Aterfax/pbs-client-do
 
 - [Quickstart](#Quickstart)
 - [Configuration](#Configuration)
+- [Helper Scripts](<#Helper Scripts>)
 - [FAQ](#FAQ)
 - [License](#License)
 
@@ -92,6 +93,23 @@ The following environment variables can be configured to customize the behavior 
 | **PRE_HOOK_DIR**                      | `/hooks/pre.d`                         | Any non-empty string (folder path) | Optional: Directory containing bash script pre-backup hooks to run.  |
 | **POST_HOOK_DIR**                     | `/hooks/post.d`                        | Any non-empty string (folder path) | Optional: Directory containing bash script post-backup hooks to run. |
 | **HOOK_TIMEOUT**                      | `300`                                  | Any valid whole number             | Optional: The maximum time in seconds all hooks are allowed to take. |
+
+## Helper Scripts
+
+Various utility scripts are available within the container shell to assist with backup management, restoration, monitoring, and validation. These can be found at [`src/helper_scripts`](https://github.com/coxde/pbs-client/tree/main/src/helper_scripts).
+
+> [!NOTE]  
+> These commands must be run within the container. i.e. start a terminal in the container:
+> `docker/podman exec -it container_name bash`
+
+**Backup & Restore:**
+
+- **`restore-backup`** - Interactive script to select a backup time, choose a specific file to restore (e.g., `.pxar`, `.pcat`, encrypted keys), and specify the target directory with confirmation prompts.
+- **`list-all-backups`** - Lists all available backups on the Proxmox Backup Server with their type, hostname, timestamp, and size in MB.
+- **`list-all-backup-files`** - Displays all files across all backups (`.pxar`, `.pcat`, encrypted keys) grouped by timestamp for comprehensive inventory review.
+- **`list-backup-files`** - Shows all files within a single selected backup for focused inspection before restoration.
+- **`lastbackup`** - Shows the timestamp of the last successful backup run to verify schedule execution.
+- **`backupnow`** - Runs an immediate manual backup from inside the container.
 
 ## FAQ
 
