@@ -1,0 +1,267 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+
+# =============================================================================
+# Interactive restoration of selected files from a single archive in a single
+# snapshot on the Proxmox Backup Server.
+#
+# Flow:
+#   1. Select a backup snapshot (numbered list, newest first).
+#   2. Select an archive within that snapshot (.pxar.didx, .ppxar.didx,
+#      .pcat1.didx, .blob, etc.).
+#   3. Select or type a restore destination (existing /backups subdirectory
+#      or any custom absolute path).
+#   4. For .pxar.didx archives: drop into the PBS catalog shell so you can
+#      navigate, search (find), select, and restore individual files
+#      interactively. The chosen restore path is shown as a hint for the
+#      `restore-selected <path>` command.
+#      For all other archive types (.ppxar.didx, .pcat1.didx, *.blob):
+#      restore the whole archive directly via `proxmox-backup-client restore`.
+#
+# Example session (.pxar.didx → catalog shell):
+#
+#   root@pbs-client:/# restore-select-backup-files
+#   Select a backup time:
+#   1. 2026-02-21T19:43:09Z
+#   2. 2026-02-21T19:44:00Z
+#
+#   Enter the number of the backup you want to select: 1
+#   Select an archive to restore from:
+#   1. backups-test1.ppxar.didx
+#   2. catalog.pcat1.didx
+#   3. rsa-encrypted.key.blob
+#
+#   Enter the number of the archive you want to restore from: 1
+#   Select the directory to restore to:
+#   1. /backups/test1
+#   2. /root/.config/proxmox-backup/tmp-restore
+#   3. Enter a custom path...
+#
+#   Enter the number of the restore destination: 2
+#   Enter an absolute restore path: /tmp/my-restore
+#
+#   Selected restore details:
+#   Backup Type: host
+#   Backup Time: 2026-02-21T19:43:09Z
+#   Backup Host: pbs-client
+#   Selected Archive: backups-test1.ppxar.didx
+#   Selected Restore Path: /tmp/my-restore/
+#
+#   Are these details correct? Press Enter to continue or Ctrl+C to cancel...
+#
+#   Entering PBS catalog shell.
+#
+#   Select files, run: select FILENAME
+#   Restore selected files, run: restore-selected /tmp/my-restore/
+#   (or: restore /tmp/my-restore/ --pattern '<glob>')
+#
+#   See more: https://pbs.proxmox.com/docs/backup-client.html#interactive-restores
+#
+#   Starting interactive shell
+#   pxar:/ > ls
+#   ...
+#
+# Non-pxar archives (.pcat1.didx, *.blob) are restored as a whole archive via
+# `proxmox-backup-client restore`, matching `restore-backup`.
+#
+# Must be run within the container. i.e. start a terminal in the container:
+#        docker exec -it container_name bash
+# =============================================================================
+
+source /etc/s6-overlay/s6-rc.d/setup_check/run_include
+
+# Function to list directories under supplied path. Output is newline-delimited.
+list_directories() {
+    local path="$1"
+    find "$path" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null \
+        | while IFS= read -r name; do
+            printf '%s/%s\n' "$path" "$name"
+        done
+}
+
+# Helper: split a newline-delimited string into a bash array.
+# Uses a temp file rather than `< <(...)` process substitution so the script
+# works in environments where /proc/self/fd isn't available.
+read_into_array() {
+    # $1 = name of variable to populate (set via nameref)
+    local -n arr="$1"
+    local src="$2"
+    arr=()
+    local tmp _line
+    tmp=$(mktemp) || return 1
+    printf '%s\n' "$src" >"$tmp"
+    while IFS= read -r _line; do
+        [ -n "$_line" ] && arr+=("$_line")
+    done <"$tmp"
+    rm -f "$tmp"
+}
+
+# Build the command to list snapshots, honouring the configured namespace.
+LISTCMD="proxmox-backup-client snapshot list"
+if [ -n "$PBS_DATASTORE_NS" ]; then
+    LISTCMD+=" --ns ${PBS_DATASTORE_NS}"
+fi
+LISTCMD+=" --output-format json"
+
+data=$(${LISTCMD})
+host_name=$(hostname)
+
+# Snapshot list (newest first) for this host.
+snapshot_stream=$(echo "$data" | jq -r --arg host "$host_name" '
+    .[] |
+    select(.["backup-id"] == $host) |
+    .["backup-time"] | tonumber | strftime("%Y-%m-%dT%H:%M:%SZ")' | sort -r | uniq)
+backup_times=()
+read_into_array backup_times "$snapshot_stream"
+
+if [ "${#backup_times[@]}" -eq 0 ]; then
+    echo "No backups found for host '$host_name'."
+    exit 1
+fi
+
+echo "Select a backup time:"
+for ((i=0; i<${#backup_times[@]}; i++)); do
+    echo "$((i+1)). ${backup_times[i]}"
+done
+
+read -p "Enter the number of the backup you want to select: " selection
+if [[ $selection =~ ^[0-9]+$ && $selection -ge 1 && $selection -le ${#backup_times[@]} ]]; then
+    selected_backup_time="${backup_times[$((selection-1))]}"
+else
+    echo "Invalid selection."
+    exit 1
+fi
+
+selected_backup_data=$(echo "$data" | jq -r --arg host "$host_name" --arg timestamp "$selected_backup_time" '
+    .[] |
+    select(.["backup-id"] == $host and (.["backup-time"] | tonumber | strftime("%Y-%m-%dT%H:%M:%SZ")) == $timestamp)')
+
+selected_backup_type=$(echo "$selected_backup_data" | jq -r '.["backup-type"]')
+selected_backup_id=$(echo "$selected_backup_data" | jq -r '.["backup-id"]')
+
+# Archive (file) list inside this snapshot.
+archive_stream=$(echo "$selected_backup_data" | jq -r '.files[].filename')
+archives=()
+read_into_array archives "$archive_stream"
+
+echo "Select an archive to restore from:"
+for ((i=0; i<${#archives[@]}; i++)); do
+    echo "$((i+1)). ${archives[i]}"
+done
+
+read -p "Enter the number of the archive you want to restore from: " archive_selection
+if [[ $archive_selection =~ ^[0-9]+$ && $archive_selection -ge 1 && $archive_selection -le ${#archives[@]} ]]; then
+    selected_archive="${archives[$((archive_selection-1))]}"
+else
+    echo "Invalid selection."
+    exit 1
+fi
+
+snapshot_ref="${selected_backup_type}/${selected_backup_id}/${selected_backup_time}"
+
+# ----- Restore path picker --------------------------------------------------
+echo "Select the directory to restore to:"
+dirs=()
+dirs_stream=$(list_directories /backups)
+read_into_array dirs "$dirs_stream"
+for ((i=0; i<${#dirs[@]}; i++)); do
+    echo "$((i+1)). ${dirs[i]}"
+done
+# Pre-set restore location for quick temporary restores.
+tmp_restore="/root/.config/proxmox-backup/tmp-restore"
+tmp_restore_option=$((${#dirs[@]} + 1))
+echo "${tmp_restore_option}. ${tmp_restore}"
+custom_option=$((${#dirs[@]} + 2))
+echo "${custom_option}. Enter a custom path..."
+
+read -p "Enter the number of the restore destination: " dir_selection
+if [[ $dir_selection =~ ^[0-9]+$ && $dir_selection -ge 1 && $dir_selection -le ${#dirs[@]} ]]; then
+    selected_directory="${dirs[$((dir_selection-1))]}"
+    restore_path="${selected_directory}/"
+elif [[ $dir_selection -eq $tmp_restore_option ]]; then
+    if ! mkdir -p "$tmp_restore" 2>/dev/null; then
+        echo "Error: cannot create '$tmp_restore'."
+        exit 1
+    fi
+    restore_path="${tmp_restore}/"
+elif [[ $dir_selection -eq $custom_option ]]; then
+    while :; do
+        read -p "Enter an absolute restore path: " custom_path
+        if [[ "$custom_path" != /* ]]; then
+            echo "Error: path must be absolute."
+            continue
+        fi
+        # Create the directory if it doesn't exist (restore will populate it).
+        if ! mkdir -p "$custom_path" 2>/dev/null; then
+            echo "Error: cannot create '$custom_path'."
+            continue
+        fi
+        restore_path="${custom_path}/"
+        break
+    done
+else
+    echo "Invalid selection."
+    exit 1
+fi
+
+# ----- Confirmation ---------------------------------------------------------
+echo -e "\nSelected restore details:"
+echo "Backup Type: $selected_backup_type"
+echo "Backup Time: $selected_backup_time"
+echo "Backup Host: $selected_backup_id"
+echo "Selected Archive: $selected_archive"
+echo "Selected Restore Path: $restore_path"
+echo ""
+
+# Pre-check that the destination is writable.
+if ! { tempfile=$(mktemp -p "${restore_path}" .restore_test.XXXXXX) && rm -f "$tempfile"; } 2>/dev/null; then
+    echo "Error: The chosen restore directory '${restore_path}' is not writable."
+    exit 1
+fi
+
+read -rp "Are these details correct? Press Enter to continue or Ctrl+C to cancel..."
+
+# ----- Branch on archive type ----------------------------------------------
+# .pxar.didx / .ppxar.didx / .mpxar.didx -> catalog shell (interactive)
+# everything else (.pcat1.didx, *.blob) -> whole-archive restore
+case "$selected_archive" in
+    *.pxar.didx|*.ppxar.didx|*.mpxar.didx)
+        # catalog shell expects the archive name WITHOUT the .didx suffix.
+        # So "foo.pxar.didx" -> "foo.pxar", "foo.ppxar.didx" -> "foo.ppxar",
+        # "foo.mpxar.didx" -> "foo.mpxar".
+        archive_for_shell="${selected_archive%.didx}"
+
+        SHELLCMD="proxmox-backup-client catalog shell ${snapshot_ref} ${archive_for_shell}"
+        if [ -n "$PBS_DATASTORE_NS" ]; then
+            SHELLCMD+=" --ns ${PBS_DATASTORE_NS}"
+        fi
+
+        echo -e "\nEntering PBS catalog shell."
+        echo ""
+        echo "Select files, run: select FILENAME"
+        echo "Restore selected files, run: restore-selected ${restore_path}"
+        echo "(or: restore ${restore_path} --pattern '<glob>')"
+        echo ""
+        echo "See more: https://pbs.proxmox.com/docs/backup-client.html#interactive-restores"
+        echo ""
+
+        exec ${SHELLCMD}
+        ;;
+    *)
+        # Whole-archive restore for .ppxar.didx, .pcat1.didx, *.blob, etc.
+        RESTORECMD="proxmox-backup-client restore ${snapshot_ref} ${selected_archive} ${restore_path}"
+        if [ -n "$PBS_DATASTORE_NS" ]; then
+            RESTORECMD+=" --ns ${PBS_DATASTORE_NS}"
+        fi
+        if [ -n "$PBS_RESTORE_CMD_APPEND_EXTRA_OPTS" ]; then
+            RESTORECMD+=" ${PBS_RESTORE_CMD_APPEND_EXTRA_OPTS}"
+        fi
+
+        echo -e "\nRestore command:"
+        echo "${RESTORECMD}"
+
+        read -rp "Is this restore command correct? Press Enter to continue or Ctrl+C to cancel..."
+
+        eval "$RESTORECMD"
+        ;;
+esac

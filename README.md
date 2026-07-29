@@ -105,6 +105,7 @@ Various utility scripts are available within the container shell to assist with 
 **Backup & Restore:**
 
 - **`restore-backup`** - Interactive script to select a backup time, choose a specific file to restore (e.g., `.pxar`, `.pcat`, encrypted keys), and specify the target directory with confirmation prompts.
+- **`restore-select-backup-files`** - Interactive script to restore selected file(s) from a single archive in a chosen snapshot. Pick a snapshot, pick an archive, then pick or type a restore destination (existing `/backups` subdirectory or any custom absolute path, validated as writable). For `.pxar.didx`, `.ppxar.didx` and `.mpxar.didx` archives you are then dropped into the PBS `catalog shell` where you can navigate, search, and restore individual files. For other archive types, the whole archive is restored via `proxmox-backup-client restore`, matching `restore-backup` script.
 - **`list-all-backups`** - Lists all available backups on the Proxmox Backup Server with their type, hostname, timestamp, and size in MB.
 - **`list-all-backup-files`** - Displays all files across all backups (`.pxar`, `.pcat`, encrypted keys) grouped by timestamp for comprehensive inventory review.
 - **`list-backup-files`** - Shows all files within a single selected backup for focused inspection before restoration.
