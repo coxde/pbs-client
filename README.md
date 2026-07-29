@@ -6,7 +6,7 @@ Forked from [Aterfax/pbs-client-docker](https://github.com/Aterfax/pbs-client-do
 
 - [Quickstart](#Quickstart)
 - [Configuration](#Configuration)
-- [Helper Scripts](<#Helper Scripts>)
+- [Helper Scripts](#Helper-Scripts)
 - [FAQ](#FAQ)
 - [License](#License)
 
