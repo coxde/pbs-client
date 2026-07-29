@@ -249,7 +249,20 @@ case "$selected_archive" in
         ;;
     *)
         # Whole-archive restore for .ppxar.didx, .pcat1.didx, *.blob, etc.
-        RESTORECMD="proxmox-backup-client restore ${snapshot_ref} ${selected_archive} ${restore_path}"
+        case "$selected_archive" in
+            *.blob|*.fidx)
+                # Derive a clean filename from the archive name.
+                # e.g. "rsa-encrypted.key.blob" -> "rsa-encrypted.key"
+                restore_filename="${selected_archive%.blob}"
+                restore_filename="${restore_filename%.fidx}"
+                restore_target="${restore_path}${restore_filename}"
+                ;;
+            *)
+                restore_target="${restore_path}"
+                ;;
+        esac
+
+        RESTORECMD="proxmox-backup-client restore ${snapshot_ref} ${selected_archive} ${restore_target}"
         if [ -n "$PBS_DATASTORE_NS" ]; then
             RESTORECMD+=" --ns ${PBS_DATASTORE_NS}"
         fi
