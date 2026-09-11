@@ -2,7 +2,7 @@
 # Proxmox Backup Client Containerfile for ARM64
 #
 
-FROM ghcr.io/linuxserver/baseimage-debian:trixie@sha256:d1f8014fb5467338f4206cca676a2a872334d59d6ace134f02d02fc696c1bbc0
+FROM ghcr.io/linuxserver/baseimage-debian:trixie@sha256:7422db454d4eb55f325f2f1f3df332a5c6f86530965780d8d63909dceba51a3a
 
 LABEL maintainer="coxde"
 
